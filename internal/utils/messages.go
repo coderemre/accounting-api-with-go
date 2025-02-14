@@ -18,6 +18,9 @@ const (
 	ErrServerListenFailed   Message = "Server listen and serve failed"
 	ErrServerShutdownFailed Message = "Server forced to shutdown"
 
+	ErrParseCreatedAt     Message = "Failed to parse created_at"
+	ErrParseUpdatedAt     Message = "Failed to parse updated_at"
+
 	ErrUserAlreadyExists Message = "User with this email already exists"
 	ErrUsernameExists    Message = "Username already exists"
 
