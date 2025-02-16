@@ -20,25 +20,34 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var user models.User
+
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		utils.Log.Error().Err(err).Msg(utils.ErrInvalidRequest.String())
 		writeErrorResponse(w, utils.ErrInvalidRequest, http.StatusBadRequest)
 		return
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.PasswordHash), bcrypt.DefaultCost)
+	if errMsg := user.Validate(false); errMsg != "" {
+		utils.Log.Error().Msg(string(errMsg))
+		writeErrorResponse(w, errMsg, http.StatusBadRequest)
+		return
+	}
+	
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		utils.Log.Error().Err(err).Msg(utils.ErrPasswordHashFailed.String())
 		writeErrorResponse(w, utils.ErrPasswordHashFailed, http.StatusInternalServerError)
 		return
 	}
+	user.Password = string(hashedPassword)
 
 	query := `
 		INSERT INTO users (username, email, password_hash, role, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
-	result, err := database.DB.Exec(query, user.Username, user.Email, hashedPassword, user.Role, now, now)
+	result, err := database.DB.Exec(query, user.Username, user.Email, user.Password, user.Role, now, now)
 	if err != nil {
 		utils.Log.Error().Err(err).Msg(utils.ErrDuplicateEntry.String())
 		if strings.Contains(err.Error(), "users.username") {
@@ -57,7 +66,6 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		writeErrorResponse(w, utils.ErrUserRetrievalFailed, http.StatusInternalServerError)
 		return
 	}
-
 	user.ID = userID
 
 	token, err := generateJWT(user)
@@ -85,63 +93,40 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		claims, err := verifyJWT(tokenString)
-		if err == nil {
-			var user models.User
-			var createdAtStr, updatedAtStr string
-			query := "SELECT id, username, email, role, created_at, updated_at FROM users WHERE id = ?"
-			err := database.DB.QueryRow(query, claims["user_id"]).Scan(
-				&user.ID, &user.Username, &user.Email, &user.Role, &createdAtStr, &updatedAtStr,
-			)
-			if err != nil {
-				utils.Log.Error().Err(err).Msg(utils.ErrUserRetrievalFailed.String())
-				writeErrorResponse(w, utils.ErrUserRetrievalFailed, http.StatusInternalServerError)
-				return
-			}
+		var user models.User
 
-			newToken, err := generateJWT(user)
-			if err != nil {
-				utils.Log.Error().Err(err).Msg(utils.ErrTokenGeneration.String())
-				writeErrorResponse(w, utils.ErrTokenGeneration, http.StatusInternalServerError)
-				return
-			}
-
-			user.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
-
-			if err != nil {
-				writeErrorResponse(w, utils.ErrParseCreatedAt, http.StatusInternalServerError)
-				return
-			}
-
-			user.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr)
-
-			if err != nil {
-				writeErrorResponse(w, utils.ErrParseUpdatedAt, http.StatusInternalServerError)
-				return
-			}
-
-			response := map[string]interface{}{
-				"error":   false,
-				"message": utils.SuccessTokenValidated.String(),
-				"user":    user,
-				"token":   newToken,
-			}
-			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(response); err != nil {
-				utils.Log.Error().Err(err).Msg(utils.ErrResponseEncodingFailed.String())
-				writeErrorResponse(w, utils.ErrResponseEncodingFailed, http.StatusInternalServerError)
-			}
+		authUser, errMsg := user.ValidateToken(tokenString)
+		if errMsg != "" {
+			utils.Log.Error().Msg(string(errMsg))
+			writeErrorResponse(w, errMsg, http.StatusUnauthorized)
 			return
 		}
+
+		response := map[string]interface{}{
+			"error":   false,
+			"message": utils.SuccessLogin.String(),
+			"user":    authUser,
+			"token":   tokenString,
+		}
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			utils.Log.Error().Err(err).Msg(utils.ErrResponseEncodingFailed.String())
+			writeErrorResponse(w, utils.ErrResponseEncodingFailed, http.StatusInternalServerError)
+		}
+		return
 	}
 
-	var credentials struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
+	var credentials models.User
+
 	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
 		utils.Log.Error().Err(err).Msg(utils.ErrInvalidRequest.String())
 		writeErrorResponse(w, utils.ErrInvalidRequest, http.StatusBadRequest)
+		return
+	}
+
+	if errMsg := credentials.Validate(true); errMsg != "" {
+		utils.Log.Error().Msg(string(errMsg))
+		writeErrorResponse(w, errMsg, http.StatusBadRequest)
 		return
 	}
 
@@ -150,7 +135,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	query := "SELECT id, username, email, password_hash, role, created_at, updated_at FROM users WHERE email = ?"
 	err := database.DB.QueryRow(query, credentials.Email).Scan(
-		&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Role, &createdAtStr, &updatedAtStr,
+		&user.ID, &user.Username, &user.Email, &user.Password, &user.Role, &createdAtStr, &updatedAtStr,
 	)
 	if err != nil {
 		utils.Log.Error().Err(err).Msg(utils.ErrInvalidCredentials.String())
@@ -158,30 +143,16 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(credentials.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(credentials.Password)); err != nil {
 		utils.Log.Error().Err(err).Msg(utils.ErrInvalidCredentials.String())
 		writeErrorResponse(w, utils.ErrInvalidCredentials, http.StatusUnauthorized)
 		return
 	}
 
-	user.CreatedAt, err = time.Parse("2006-01-02 15:04:05", createdAtStr)
-
-	if err != nil {
-		writeErrorResponse(w, utils.ErrParseCreatedAt, http.StatusInternalServerError)
-		return
-	}
-
-	user.UpdatedAt, err = time.Parse("2006-01-02 15:04:05", updatedAtStr)
-	
-	if err != nil {
-		writeErrorResponse(w, utils.ErrParseUpdatedAt, http.StatusInternalServerError)
-		return
-	}
-
-	token, err := generateJWT(user)
-	if err != nil {
-		utils.Log.Error().Err(err).Msg(utils.ErrTokenGeneration.String())
-		writeErrorResponse(w, utils.ErrTokenGeneration, http.StatusInternalServerError)
+	token, errMsg := user.GenerateToken()
+	if errMsg != "" {
+		utils.Log.Error().Msg(string(errMsg))
+		writeErrorResponse(w, errMsg, http.StatusInternalServerError)
 		return
 	}
 
