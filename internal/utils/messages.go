@@ -11,6 +11,14 @@ const (
 	ErrDuplicateEntry       Message = "Duplicate entry"
 	ErrEnvFileNotFound Message = "No .env file found, using system environment variables"
 
+	ErrUserIDRequired         Message = "User ID is required"
+	ErrInvalidAmount          Message = "Transaction amount must be greater than zero"
+	ErrInvalidTransactionStatus Message = "Invalid transaction status"
+
+	ErrNegativeBalance    Message = "Balance cannot be negative"
+	ErrInsufficientFunds  Message = "Insufficient funds for this transaction"
+	
+
 	ErrUsernameRequired    Message = "Username cannot be empty"
 	ErrEmailRequired       Message = "Email cannot be empty"
 	ErrInvalidEmailFormat  Message = "Invalid email format"

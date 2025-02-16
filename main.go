@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"accounting-api-with-go/internal/config"
-	"accounting-api-with-go/internal/utils"
 	"accounting-api-with-go/internal/database"
+	"accounting-api-with-go/internal/utils"
 	"accounting-api-with-go/middlewares"
 	"accounting-api-with-go/routes"
 )
