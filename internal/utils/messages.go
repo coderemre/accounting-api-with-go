@@ -37,7 +37,7 @@ const (
 
 	ErrDatabaseConnectionFailed Message = "Failed to connect to the database"
 	ErrDatabasePingFailed       Message = "Failed to ping the database"
-	ErrUserAlreadyExists        Message = "User with this email already exists"
+	ErrUserAlreadyExists        Message = "Email or username is already taken"
 	ErrUsernameExists           Message = "Username already exists"
 	
 

@@ -10,8 +10,8 @@ import (
 
 	"accounting-api-with-go/internal/config"
 	"accounting-api-with-go/internal/database"
+	"accounting-api-with-go/internal/middlewares"
 	"accounting-api-with-go/internal/utils"
-	"accounting-api-with-go/middlewares"
 	"accounting-api-with-go/routes"
 )
 
@@ -22,9 +22,9 @@ func main() {
 	utils.InitLogger(cfg.Port)
 	utils.Log.Info().Msg(utils.SuccessLoggerInitialized.String())
 
-	database.Connect()
+	var db = database.Connect()
 
-	router := routes.SetupRoutes()
+	router := routes.SetupRoutes(db)
 	router.Use(middlewares.Logger)
 
 	server := &http.Server{

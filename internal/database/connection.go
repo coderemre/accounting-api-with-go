@@ -12,7 +12,7 @@ import (
 
 var DB *sql.DB
 
-func Connect() {
+func Connect() *sql.DB {
 	var err error
 
 	cfg := config.LoadConfig()
@@ -32,6 +32,8 @@ func Connect() {
 	}
 
 	utils.Log.Info().Msg(utils.SuccessDatabaseConnected.String())
+
+	return DB
 }
 
 func Close() error {

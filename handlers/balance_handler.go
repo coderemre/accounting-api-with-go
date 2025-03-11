@@ -1,58 +1,78 @@
 package handlers
 
 import (
-	"accounting-api-with-go/internal/services"
-	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
-	"github.com/gorilla/mux"
+	"accounting-api-with-go/internal/services"
+	"accounting-api-with-go/internal/utils"
 )
 
 type BalanceHandler struct {
-	BalanceService services.BalanceService
+	BalanceService *services.BalanceService
 }
 
-func (h *BalanceHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userID, err := strconv.ParseInt(vars["user_id"], 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
-		return
-	}
-
-	balance, err := h.BalanceService.GetBalance(userID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]float64{"balance": balance})
+func NewBalanceHandler(balanceService *services.BalanceService) *BalanceHandler {
+	return &BalanceHandler{BalanceService: balanceService}
 }
 
-func (h *BalanceHandler) UpdateBalance(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userID, err := strconv.ParseInt(vars["user_id"], 10, 64)
+func (h *BalanceHandler) GetCurrentBalance(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.ParseInt(r.URL.Query().Get("user_id"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		utils.WriteErrorResponse(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 
-	var req struct {
-		Amount float64 `json:"amount"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
-
-	err = h.BalanceService.UpdateBalance(userID, req.Amount)
+	balance, err := h.BalanceService.GetCurrentBalance(userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Balance updated successfully"})
+	utils.WriteSuccessResponse(w, map[string]float64{"current_balance": balance}, http.StatusOK)
+}
+
+func (h *BalanceHandler) GetHistoricalBalances(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.ParseInt(r.URL.Query().Get("user_id"), 10, 64)
+	if err != nil {
+		utils.WriteErrorResponse(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	history, err := h.BalanceService.GetBalanceHistory(userID)
+	if err != nil {
+		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	utils.WriteSuccessResponse(w, history, http.StatusOK)
+}
+
+func (h *BalanceHandler) GetBalanceAtTime(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.ParseInt(r.URL.Query().Get("user_id"), 10, 64)
+	if err != nil {
+		utils.WriteErrorResponse(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	timestamp := r.URL.Query().Get("timestamp")
+	if timestamp == "" {
+		utils.WriteErrorResponse(w, "Timestamp is required", http.StatusBadRequest)
+		return
+	}
+
+	parsedTime, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		utils.WriteErrorResponse(w, "Invalid timestamp format, expected RFC3339", http.StatusBadRequest)
+		return
+	}
+
+	balance, err := h.BalanceService.GetBalanceAtTime(userID, parsedTime)
+	if err != nil {
+		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	utils.WriteSuccessResponse(w, map[string]float64{"balance_at_time": balance}, http.StatusOK)
 }
