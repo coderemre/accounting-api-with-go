@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
+	"accounting-api-with-go/internal/middlewares"
+	"accounting-api-with-go/internal/models"
 	"accounting-api-with-go/internal/services"
 	"accounting-api-with-go/internal/utils"
 )
@@ -18,11 +20,13 @@ func NewBalanceHandler(balanceService *services.BalanceService) *BalanceHandler 
 }
 
 func (h *BalanceHandler) GetCurrentBalance(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.ParseInt(r.URL.Query().Get("user_id"), 10, 64)
-	if err != nil {
-		utils.WriteErrorResponse(w, "Invalid user ID", http.StatusBadRequest)
+	fmt.Printf("DEBUG CONTEXT USER: %#v\n", r.Context().Value("user"))
+	user, ok := r.Context().Value(middlewares.UserContextKey).(*models.User)
+	if !ok || user == nil {
+		utils.WriteErrorResponse(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	userID := user.ID
 
 	balance, err := h.BalanceService.GetCurrentBalance(userID)
 	if err != nil {
@@ -34,11 +38,12 @@ func (h *BalanceHandler) GetCurrentBalance(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *BalanceHandler) GetHistoricalBalances(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.ParseInt(r.URL.Query().Get("user_id"), 10, 64)
-	if err != nil {
-		utils.WriteErrorResponse(w, "Invalid user ID", http.StatusBadRequest)
+	user, ok := r.Context().Value(middlewares.UserContextKey).(*models.User)
+	if !ok || user == nil {
+		utils.WriteErrorResponse(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	userID := user.ID
 
 	history, err := h.BalanceService.GetBalanceHistory(userID)
 	if err != nil {
@@ -50,11 +55,12 @@ func (h *BalanceHandler) GetHistoricalBalances(w http.ResponseWriter, r *http.Re
 }
 
 func (h *BalanceHandler) GetBalanceAtTime(w http.ResponseWriter, r *http.Request) {
-	userID, err := strconv.ParseInt(r.URL.Query().Get("user_id"), 10, 64)
-	if err != nil {
-		utils.WriteErrorResponse(w, "Invalid user ID", http.StatusBadRequest)
+	user, ok := r.Context().Value(middlewares.UserContextKey).(*models.User)
+	if !ok || user == nil {
+		utils.WriteErrorResponse(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	userID := user.ID
 
 	timestamp := r.URL.Query().Get("timestamp")
 	if timestamp == "" {

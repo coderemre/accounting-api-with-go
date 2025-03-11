@@ -25,8 +25,24 @@ func (r *BalanceRepository) GetBalance(userID int64) (*models.Balance, error) {
 }
 
 func (r *BalanceRepository) UpdateBalance(userID int64, newAmount float64) error {
-	_, err := r.DB.Exec(`UPDATE balances SET amount = ? WHERE user_id = ?`, newAmount, userID)
-	return err
+	result, err := r.DB.Exec(`UPDATE balances SET amount = ? WHERE user_id = ?`, newAmount, userID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		_, err = r.DB.Exec(`INSERT INTO balances (user_id, amount) VALUES (?, ?)`, userID, newAmount)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *BalanceRepository) GetBalanceHistory(userID int64) ([]models.BalanceHistory, error) {

@@ -1,52 +1,61 @@
 package routes
 
 import (
+	"database/sql"
+
+	"github.com/gorilla/mux"
+
 	"accounting-api-with-go/handlers"
 	"accounting-api-with-go/internal/middlewares"
 	"accounting-api-with-go/internal/repositories"
 	"accounting-api-with-go/internal/services"
-	"database/sql"
-
-	"github.com/gorilla/mux"
 )
 
 func SetupRoutes(db *sql.DB) *mux.Router {
 	router := mux.NewRouter()
 
-	// Repositories
 	userRepo := repositories.NewUserRepository(db)
-	transactionRepo := repositories.NewTransactionRepository(db)
 	balanceRepo := repositories.NewBalanceRepository(db)
+	transactionRepo := repositories.NewTransactionRepository(db)
 
-	// Services
-	userService := services.NewUserService(userRepo)
 	balanceService := services.NewBalanceService(balanceRepo)
+	userService := services.NewUserService(userRepo, balanceService)
 	transactionService := services.NewTransactionService(transactionRepo, balanceService)
 
-	// Handlers
 	userHandler := handlers.NewUserHandler(userService)
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	balanceHandler := handlers.NewBalanceHandler(balanceService)
 
-	// Public routes (JWT gerekmeyen)
-	router.HandleFunc("/user-login", userHandler.Login).Methods("POST")
-	router.HandleFunc("/user-register", userHandler.Register).Methods("POST")
+	authRoutes := router.PathPrefix("/api/v1/auth").Subrouter()
+	authRoutes.HandleFunc("/register", userHandler.Register).Methods("POST")
+	authRoutes.HandleFunc("/login", userHandler.Login).Methods("POST")
+	authRoutes.HandleFunc("/refresh", userHandler.RefreshToken).Methods("POST")
 
-	// Protected routes (JWT doğrulama gerektiren)
-	protectedRoutes := router.PathPrefix("/api/v1").Subrouter()
-	protectedRoutes.Use(middlewares.JWTAuthMiddleware(userRepo))
 
-	// Transaction Endpoints
-	protectedRoutes.HandleFunc("/transactions/credit", transactionHandler.Credit).Methods("POST")
-	protectedRoutes.HandleFunc("/transactions/debit", transactionHandler.Debit).Methods("POST")
-	protectedRoutes.HandleFunc("/transactions/transfer", transactionHandler.Transfer).Methods("POST")
-	protectedRoutes.HandleFunc("/transactions/history", transactionHandler.GetTransactionHistory).Methods("GET")
-	protectedRoutes.HandleFunc("/transactions/{id:[0-9]+}", transactionHandler.GetTransactionByID).Methods("GET")
+	userRoutes := router.PathPrefix("/api/v1/users").Subrouter()
+	userRoutes.Use(middlewares.JWTAuthMiddleware(userRepo))
 
-	// Balance Endpoints
-	protectedRoutes.HandleFunc("/balances/current", balanceHandler.GetCurrentBalance).Methods("GET")
-	protectedRoutes.HandleFunc("/balances/historical", balanceHandler.GetHistoricalBalances).Methods("GET")
-	protectedRoutes.HandleFunc("/balances/at-time", balanceHandler.GetBalanceAtTime).Methods("GET")
+	userRoutes.HandleFunc("", middlewares.RequireAdmin(userHandler.GetAllUsers)).Methods("GET")
+	userRoutes.HandleFunc("/{id:[0-9]+}", middlewares.RequireAdmin(userHandler.GetUserByID)).Methods("GET")
+	userRoutes.HandleFunc("/{id:[0-9]+}", middlewares.RequireAdmin(userHandler.DeleteUser)).Methods("DELETE")
+
+
+	userRoutes.HandleFunc("/{id:[0-9]+}", userHandler.UpdateUser).Methods("PUT")
+
+	transactionRoutes := router.PathPrefix("/api/v1/transactions").Subrouter()
+	transactionRoutes.Use(middlewares.JWTAuthMiddleware(userRepo))
+	transactionRoutes.HandleFunc("/credit", transactionHandler.Credit).Methods("POST")
+	transactionRoutes.HandleFunc("/debit", transactionHandler.Debit).Methods("POST")
+	transactionRoutes.HandleFunc("/transfer", transactionHandler.Transfer).Methods("POST")
+	transactionRoutes.HandleFunc("/history", transactionHandler.GetTransactionHistory).Methods("GET")
+	transactionRoutes.HandleFunc("/{id:[0-9]+}", transactionHandler.GetTransactionByID).Methods("GET")
+
+
+	balanceRoutes := router.PathPrefix("/api/v1/balances").Subrouter()
+	balanceRoutes.Use(middlewares.JWTAuthMiddleware(userRepo))
+	balanceRoutes.HandleFunc("/current", balanceHandler.GetCurrentBalance).Methods("GET")
+	balanceRoutes.HandleFunc("/historical", balanceHandler.GetHistoricalBalances).Methods("GET")
+	balanceRoutes.HandleFunc("/at-time", balanceHandler.GetBalanceAtTime).Methods("GET")
 
 	return router
 }

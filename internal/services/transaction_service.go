@@ -37,7 +37,6 @@ func (s *TransactionService) ProcessTransaction(userID int64, amount float64) (*
 
 	err = s.TransactionRepo.CreateTransaction(transaction)
 	if err != nil {
-		// Hata olursa rollback yap
 		_ = s.BalanceService.UpdateBalance(userID, -amount)
 		return nil, err
 	}

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -16,22 +15,6 @@ type BalanceService struct {
 
 func NewBalanceService(balanceRepo *repositories.BalanceRepository) *BalanceService {
 	return &BalanceService{BalanceRepo: balanceRepo}
-}
-
-func (s *BalanceService) UpdateBalance(userID int64, amount float64) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	balance, err := s.BalanceRepo.GetBalance(userID)
-	if err != nil {
-		return err
-	}
-
-	if balance.Amount+amount < 0 {
-		return errors.New("insufficient funds")
-	}
-
-	return s.BalanceRepo.UpdateBalance(userID, balance.Amount+amount)
 }
 
 func (s *BalanceService) GetBalanceHistory(userID int64) ([]models.BalanceHistory, error) {
@@ -53,4 +36,10 @@ func (s *BalanceService) GetBalanceAtTime(userID int64, atTime time.Time) (float
 	}
 
 	return balance, nil
+}
+
+func (s *BalanceService) UpdateBalance(userID int64, newAmount float64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.BalanceRepo.UpdateBalance(userID, newAmount)
 }
