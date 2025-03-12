@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"accounting-api-with-go/internal/auth"
 	"accounting-api-with-go/internal/middlewares"
 	"accounting-api-with-go/internal/models"
 	"accounting-api-with-go/internal/services"
@@ -160,7 +161,20 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
-	utils.WriteSuccessResponse(w, map[string]string{
-		"message": "Token refreshed successfully (not implemented)",
+	user, ok := r.Context().Value(middlewares.UserContextKey).(*models.User)
+	if !ok || user == nil {
+		utils.WriteErrorResponse(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := auth.GenerateJWT(*user)
+	if err != nil {
+		utils.WriteErrorResponse(w, "Failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	utils.WriteSuccessResponse(w, map[string]interface{}{
+		"message": "Token refreshed successfully",
+		"token":   token,
 	}, http.StatusOK)
 }

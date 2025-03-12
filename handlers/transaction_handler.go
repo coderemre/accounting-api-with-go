@@ -21,8 +21,8 @@ func NewTransactionHandler(transactionService *services.TransactionService) *Tra
 
 func (h *TransactionHandler) Credit(w http.ResponseWriter, r *http.Request) {
 	var request struct {
-		UserID int64   `json:"user_id"`
-		Amount float64 `json:"amount"`
+		ToUserID int64   `json:"to_user_id"`
+		Amount   float64 `json:"amount"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -30,7 +30,7 @@ func (h *TransactionHandler) Credit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transaction, err := h.TransactionService.ProcessTransaction(request.UserID, request.Amount)
+	transaction, err := h.TransactionService.ProcessTransaction(0, request.ToUserID, request.Amount, "credit")
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
@@ -41,8 +41,8 @@ func (h *TransactionHandler) Credit(w http.ResponseWriter, r *http.Request) {
 
 func (h *TransactionHandler) Debit(w http.ResponseWriter, r *http.Request) {
 	var request struct {
-		UserID int64   `json:"user_id"`
-		Amount float64 `json:"amount"`
+		FromUserID int64   `json:"from_user_id"`
+		Amount     float64 `json:"amount"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -50,7 +50,7 @@ func (h *TransactionHandler) Debit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transaction, err := h.TransactionService.ProcessTransaction(request.UserID, -request.Amount)
+	transaction, err := h.TransactionService.ProcessTransaction(request.FromUserID, 0, request.Amount, "debit")
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return

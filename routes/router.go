@@ -27,6 +27,7 @@ func SetupRoutes(db *sql.DB) *mux.Router {
 	balanceHandler := handlers.NewBalanceHandler(balanceService)
 
 	authRoutes := router.PathPrefix("/api/v1/auth").Subrouter()
+	authRoutes.Use(middlewares.JWTAuthMiddleware(userRepo))
 	authRoutes.HandleFunc("/register", userHandler.Register).Methods("POST")
 	authRoutes.HandleFunc("/login", userHandler.Login).Methods("POST")
 	authRoutes.HandleFunc("/refresh", userHandler.RefreshToken).Methods("POST")

@@ -3,7 +3,7 @@ package repositories
 import (
 	"accounting-api-with-go/internal/models"
 	"database/sql"
-	"errors"
+	"time"
 )
 
 type TransactionRepository struct {
@@ -15,52 +15,98 @@ func NewTransactionRepository(db *sql.DB) *TransactionRepository {
 }
 
 func (r *TransactionRepository) CreateTransaction(tx *models.Transaction) error {
-	query := `INSERT INTO transactions (user_id, amount, type, created_at) VALUES (?, ?, ?, NOW())`
-	_, err := r.DB.Exec(query, tx.UserID, tx.Amount, tx.Type)
+	query := `
+		INSERT INTO transactions (from_user_id, to_user_id, amount, type, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := r.DB.Exec(
+		query,
+		tx.FromUserID,
+		tx.ToUserID,
+		tx.Amount,
+		tx.Type,
+		tx.Status,
+		tx.CreatedAt,
+	)
+
 	return err
 }
 
 func (r *TransactionRepository) CreateTransfer(senderID, receiverID int64, amount float64) error {
-	query := `INSERT INTO transactions (user_id, amount, type, created_at) VALUES (?, ?, ?, NOW()), (?, ?, ?, NOW())`
-	_, err := r.DB.Exec(query, senderID, -amount, "debit", receiverID, amount, "credit")
+	query := `
+		INSERT INTO transactions (from_user_id, to_user_id, amount, type, status, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := r.DB.Exec(
+		query,
+		senderID,
+		receiverID,
+		amount,
+		"transfer",
+		"completed",
+		time.Now(),
+	)
+
 	return err
 }
 
 func (r *TransactionRepository) GetTransactionByID(transactionID int64) (*models.Transaction, error) {
-	var transaction models.Transaction
+	query := `
+		SELECT id, from_user_id, to_user_id, amount, type, status, created_at
+		FROM transactions
+		WHERE id = ?
+	`
 
-	query := `SELECT id, user_id, amount, type, created_at FROM transactions WHERE id = ?`
-	err := r.DB.QueryRow(query, transactionID).Scan(
-		&transaction.ID, &transaction.UserID, &transaction.Amount, &transaction.Type, &transaction.CreatedAt,
+	var tx models.Transaction
+	err := r.DB.QueryRow(query).Scan(
+		&tx.ID,
+		&tx.FromUserID,
+		&tx.ToUserID,
+		&tx.Amount,
+		&tx.Type,
+		&tx.Status,
+		&tx.CreatedAt,
 	)
 
-	if err == sql.ErrNoRows {
-		return nil, errors.New("transaction not found")
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
 
-	return &transaction, nil
+	return &tx, nil
 }
 
 func (r *TransactionRepository) GetTransactionHistory(userID int64) ([]models.Transaction, error) {
-	query := `SELECT id, user_id, amount, type, created_at FROM transactions WHERE user_id = ? ORDER BY created_at DESC`
+	query := `
+		SELECT id, from_user_id, to_user_id, amount, type, status, created_at
+		FROM transactions
+		WHERE from_user_id = ? OR to_user_id = ?
+		ORDER BY created_at DESC
+	`
 
-	rows, err := r.DB.Query(query, userID)
+	rows, err := r.DB.Query(query, userID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	var transactions []models.Transaction
-
 	for rows.Next() {
-		var transaction models.Transaction
-		err := rows.Scan(&transaction.ID, &transaction.UserID, &transaction.Amount, &transaction.Type, &transaction.CreatedAt)
+		var tx models.Transaction
+		err := rows.Scan(
+			&tx.ID,
+			&tx.FromUserID,
+			&tx.ToUserID,
+			&tx.Amount,
+			&tx.Type,
+			&tx.Status,
+			&tx.CreatedAt,
+		)
 		if err != nil {
 			return nil, err
 		}
-		transactions = append(transactions, transaction)
+		transactions = append(transactions, tx)
 	}
 
 	return transactions, nil

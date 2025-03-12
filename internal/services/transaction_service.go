@@ -3,7 +3,9 @@ package services
 import (
 	"errors"
 
+	"accounting-api-with-go/internal/constants"
 	"accounting-api-with-go/internal/models"
+
 	"accounting-api-with-go/internal/repositories"
 )
 
@@ -16,28 +18,41 @@ func NewTransactionService(txRepo *repositories.TransactionRepository, balanceSe
 	return &TransactionService{TransactionRepo: txRepo, BalanceService: balanceService}
 }
 
-func (s *TransactionService) ProcessTransaction(userID int64, amount float64) (*models.Transaction, error) {
+func (s *TransactionService) ProcessTransaction(fromUserID int64, toUserID int64, amount float64, transactionType string) (*models.Transaction, error) {
 	if amount == 0 {
 		return nil, errors.New("transaction amount cannot be zero")
 	}
 
-	err := s.BalanceService.UpdateBalance(userID, amount)
-	if err != nil {
-		return nil, err
+	if transactionType == "credit" {
+		err := s.BalanceService.UpdateBalance(toUserID, amount)
+		fromUserID = constants.DEFAULT_SYSTEM_USER_ID
+		if err != nil {
+			return nil, err
+		}
+	} else if transactionType == "debit" {
+		err := s.BalanceService.UpdateBalance(fromUserID, -amount)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.New("invalid transaction type")
 	}
 
 	transaction := &models.Transaction{
-		UserID: userID,
-		Amount: amount,
-		Type:   "credit",
-	}
-	if amount < 0 {
-		transaction.Type = "debit"
+		FromUserID: fromUserID,
+		ToUserID:   toUserID,
+		Amount:     amount,
+		Type:       transactionType,
+		Status:     "completed",
 	}
 
-	err = s.TransactionRepo.CreateTransaction(transaction)
+	err := s.TransactionRepo.CreateTransaction(transaction)
 	if err != nil {
-		_ = s.BalanceService.UpdateBalance(userID, -amount)
+		if transactionType == "credit" {
+			_ = s.BalanceService.UpdateBalance(toUserID, -amount)
+		} else if transactionType == "debit" {
+			_ = s.BalanceService.UpdateBalance(fromUserID, amount)
+		}
 		return nil, err
 	}
 
