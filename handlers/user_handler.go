@@ -12,6 +12,8 @@ import (
 	"accounting-api-with-go/internal/models"
 	"accounting-api-with-go/internal/services"
 	"accounting-api-with-go/internal/utils"
+
+	"go.opentelemetry.io/otel"
 )
 
 type UserHandler struct {
@@ -23,6 +25,10 @@ func NewUserHandler(userService *services.UserService) *UserHandler {
 }
 
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
+	tracer := otel.Tracer("user-handler")
+	ctx, span := tracer.Start(r.Context(), "Register")
+	defer span.End()
+
 	var user models.User
 	w.Header().Set("Content-Type", "application/json")
 
@@ -31,7 +37,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	createdUser, token, err := h.UserService.Register(&user)
+	createdUser, token, err := h.UserService.Register(ctx, &user)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusConflict)
 		return
@@ -50,6 +56,10 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
+	tracer := otel.Tracer("user-handler")
+	ctx, span := tracer.Start(r.Context(), "Login")
+	defer span.End()
+
 	var credentials models.User
 	w.Header().Set("Content-Type", "application/json")
 
@@ -58,7 +68,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, token, err := h.UserService.Login(credentials.Email, credentials.Password)
+	user, token, err := h.UserService.Login(ctx, credentials.Email, credentials.Password)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -77,7 +87,11 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) Profile(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value(middlewares.UserContextKey).(*models.User)
+	tracer := otel.Tracer("user-handler")
+	ctx, span := tracer.Start(r.Context(), "Profile")
+	defer span.End()
+
+	user, ok := ctx.Value(middlewares.UserContextKey).(*models.User)
 	if !ok || user == nil {
 		utils.WriteErrorResponse(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -95,7 +109,11 @@ func (h *UserHandler) Profile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := h.UserService.GetAllUsers()
+	tracer := otel.Tracer("user-handler")
+	ctx, span := tracer.Start(r.Context(), "GetAllUsers")
+	defer span.End()
+
+	users, err := h.UserService.GetAllUsers(ctx)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -104,6 +122,10 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+	tracer := otel.Tracer("user-handler")
+	ctx, span := tracer.Start(r.Context(), "GetUserByID")
+	defer span.End()
+
 	idParam := mux.Vars(r)["id"]
 	userID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
@@ -111,7 +133,7 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.UserService.GetUserByID(userID)
+	user, err := h.UserService.GetUserByID(ctx, userID)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusNotFound)
 		return
@@ -121,6 +143,10 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	tracer := otel.Tracer("user-handler")
+	ctx, span := tracer.Start(r.Context(), "UpdateUser")
+	defer span.End()
+
 	idParam := mux.Vars(r)["id"]
 	userID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
@@ -134,7 +160,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.UserService.UpdateUser(userID, &updated)
+	err = h.UserService.UpdateUser(ctx, userID, &updated)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -144,6 +170,10 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	tracer := otel.Tracer("user-handler")
+	ctx, span := tracer.Start(r.Context(), "DeleteUser")
+	defer span.End()
+
 	idParam := mux.Vars(r)["id"]
 	userID, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
@@ -151,7 +181,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.UserService.DeleteUser(userID)
+	err = h.UserService.DeleteUser(ctx, userID)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -161,7 +191,11 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
-	user, ok := r.Context().Value(middlewares.UserContextKey).(*models.User)
+	tracer := otel.Tracer("user-handler")
+	ctx, span := tracer.Start(r.Context(), "RefreshToken")
+	defer span.End()
+
+	user, ok := ctx.Value(middlewares.UserContextKey).(*models.User)
 	if !ok || user == nil {
 		utils.WriteErrorResponse(w, "Unauthorized", http.StatusUnauthorized)
 		return

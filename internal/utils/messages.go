@@ -45,7 +45,7 @@ const (
 	SuccessLogin                Message = "Login successful"
 	SuccessTokenValidated       Message = "Token validated successfully"
 	SuccessLoggerInitialized    Message = "Logger initialized successfully"
-	SuccessServerRunning        Message = "Server running on port 4520"
+	SuccessServerRunning        Message = "Server running on port 8080"
 	SuccessServerShutdown       Message = "Shutting down server..."
 	SuccessServerExited         Message = "Server exited gracefully"
 	SuccessConfigLoaded         Message = "Configuration loaded successfully"

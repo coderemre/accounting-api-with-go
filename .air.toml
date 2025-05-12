@@ -1,0 +1,21 @@
+# Air configuration for hot-reload
+
+# Project root
+root = "."
+
+# Temporary build directory
+tmp_dir = "tmp"
+
+[build]
+  # Command to build the binary
+  cmd = "go build -o tmp/main ."
+  # Path to built binary
+  bin = "tmp/main"
+  # File extensions to watch
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  # Directories to exclude from watching
+  exclude_dir = ["assets", "tmp", "vendor"]
+
+[log]
+  # Enable timestamps in logs
+  time = true

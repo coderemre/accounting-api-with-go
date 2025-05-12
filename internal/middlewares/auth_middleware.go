@@ -31,7 +31,7 @@ func JWTAuthMiddleware(userRepo *repositories.UserRepository) func(http.Handler)
 				return
 			}
 
-			user, err := userRepo.GetUserByEmail(claims.Email)
+			user, err := userRepo.GetUserByEmail(r.Context(), claims.Email)
 			if err != nil || user == nil {
 				utils.WriteErrorResponse(w, "User not found", http.StatusUnauthorized)
 				return

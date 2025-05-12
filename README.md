@@ -9,6 +9,7 @@ The Accounting API is a backend service built with Go, designed for managing use
 	•	User Management: Register and authenticate users with secure password hashing.
 	•	Transaction Management: Handle balance transfers and retrieve account details.
 	•	Authentication: JSON Web Tokens (JWT) for secure, stateless user sessions.
+	•	Application Metrics: Live Go metrics with Prometheus and Grafana
 
 ## Installation 🏗️
 
@@ -21,7 +22,7 @@ The Accounting API is a backend service built with Go, designed for managing use
 
 2. Create .env file:
     DB_HOST=127.0.0.1
-    PORT=4520
+    PORT=8080
     LOG_LEVEL=debug
     DATABASE_DSN={{username}}:{{password}}@tcp(localhost:3306)/{{DB_NAME}}
 
@@ -33,6 +34,37 @@ The Accounting API is a backend service built with Go, designed for managing use
     go run main.go
    ```
 
+
+## Monitoring Setup 📊
+
+This project includes full monitoring support via Prometheus and Grafana.
+
+### Prometheus
+
+Prometheus is configured to scrape metrics from the Go application via the `/metrics` endpoint exposed on port `2112`. These include:
+
+- Goroutine count
+- Heap memory usage
+- CPU time
+- Thread count
+
+Prometheus settings can be found in `monitoring/prometheus.yml`.
+
+### Grafana
+
+Grafana is pre-configured to visualize Prometheus metrics.
+
+📸 **Sample Dashboard Screenshot**  
+![Accounting API Metrics Dashboard](./screenshots/Metrics_Dashboard.png)
+
+To access Grafana:
+
+- URL: `http://localhost:3000`
+- Default credentials: `admin / admin`
+
+You can import the dashboard manually using the visual editor or upload a JSON panel definition.
+
+---
 
 ## What’s Inside 🚀
 ### Endpoints:

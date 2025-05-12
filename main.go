@@ -8,6 +8,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/golang-migrate/migrate/v4/database/mysql"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	"accounting-api-with-go/internal/tracing"
+
 	"accounting-api-with-go/internal/config"
 	"accounting-api-with-go/internal/database"
 	"accounting-api-with-go/internal/middlewares"
@@ -15,9 +23,37 @@ import (
 	"accounting-api-with-go/routes"
 )
 
+func startMetricsServer(port string) {
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		err := http.ListenAndServe(":" + port, nil)
+		if err != nil {
+			panic("Metrics server failed: " + err.Error())
+		}
+	}()
+}
+
 func main() {
-	database.RunMigrations()
 	cfg := config.LoadConfig()
+	// Prepare migration source URL
+	// sourceURL := "./migrations"
+	// databaseURL := os.Getenv("DATABASE_DSN")
+	// if !strings.Contains(databaseURL, "://") {
+	// 	databaseURL = "mysql://" + databaseURL
+	// }
+	// m, err := migrate.New(sourceURL, databaseURL)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	// 	log.Fatal(err)
+	// }
+
+	ctx := context.Background()
+	shutdown := tracing.InitTracer(ctx, "accounting-api")
+	defer shutdown(ctx)
+
+	startMetricsServer(cfg.MetricsPort)
 
 	utils.InitLogger(cfg.Port)
 	utils.Log.Info().Msg(utils.SuccessLoggerInitialized.String())

@@ -1,7 +1,9 @@
 package routes
 
 import (
+	"context"
 	"database/sql"
+	"net/http"
 
 	"github.com/gorilla/mux"
 
@@ -9,9 +11,16 @@ import (
 	"accounting-api-with-go/internal/middlewares"
 	"accounting-api-with-go/internal/repositories"
 	"accounting-api-with-go/internal/services"
+
+	"go.opentelemetry.io/otel"
 )
 
 func SetupRoutes(db *sql.DB) *mux.Router {
+	tracer := otel.Tracer("router")
+
+	_, span := tracer.Start(context.Background(), "SetupRoutes")
+	defer span.End()
+
 	router := mux.NewRouter()
 
 	userRepo := repositories.NewUserRepository(db)
@@ -27,10 +36,9 @@ func SetupRoutes(db *sql.DB) *mux.Router {
 	balanceHandler := handlers.NewBalanceHandler(balanceService)
 
 	authRoutes := router.PathPrefix("/api/v1/auth").Subrouter()
-	authRoutes.Use(middlewares.JWTAuthMiddleware(userRepo))
 	authRoutes.HandleFunc("/register", userHandler.Register).Methods("POST")
 	authRoutes.HandleFunc("/login", userHandler.Login).Methods("POST")
-	authRoutes.HandleFunc("/refresh", userHandler.RefreshToken).Methods("POST")
+	authRoutes.Handle("/refresh", middlewares.JWTAuthMiddleware(userRepo)(http.HandlerFunc(userHandler.RefreshToken))).Methods("POST")
 
 
 	userRoutes := router.PathPrefix("/api/v1/users").Subrouter()

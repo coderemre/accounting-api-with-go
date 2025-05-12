@@ -4,11 +4,13 @@ import (
 	"os"
 
 	"accounting-api-with-go/internal/utils"
+
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
 	Port       string
+	MetricsPort       string
 	DatabaseDSN string
 }
 
@@ -18,7 +20,8 @@ func LoadConfig() *Config {
 	}
 
 	config := &Config{
-		Port:       getEnv("PORT", "4520"),
+		Port:       getEnv("PORT", "8080"),
+		MetricsPort:       getEnv("METRICS_PORT", "2112"),
 		DatabaseDSN: getEnv("DATABASE_DSN", "<username>:<password>@tcp(localhost:3306)/bank_app"),
 	}
 
