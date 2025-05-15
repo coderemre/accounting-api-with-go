@@ -35,19 +35,6 @@ func startMetricsServer(port string) {
 
 func main() {
 	cfg := config.LoadConfig()
-	// Prepare migration source URL
-	// sourceURL := "./migrations"
-	// databaseURL := os.Getenv("DATABASE_DSN")
-	// if !strings.Contains(databaseURL, "://") {
-	// 	databaseURL = "mysql://" + databaseURL
-	// }
-	// m, err := migrate.New(sourceURL, databaseURL)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-	// 	log.Fatal(err)
-	// }
 
 	ctx := context.Background()
 	shutdown := tracing.InitTracer(ctx, "accounting-api")

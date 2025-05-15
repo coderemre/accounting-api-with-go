@@ -18,7 +18,7 @@ services:
       - .env
     command: ["air", "-c", ".air.toml"]
     environment:
-      - DATABASE_DSN=mysql://root:${DB_PASSWORD}@tcp(mysql:3306)/${DB_NAME}
+      - DATABASE_DSN=root:${DB_PASSWORD}@tcp(mysql:3306)/${DB_NAME}?parseTime=true
       - DB_USER=root
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=mysql
