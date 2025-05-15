@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile
       target: dev
     ports:
-      - "8080:8080"
-      - "2112:2112"
+      - "${PORT}:${PORT}"
+      - "${METRICS_PORT}:${METRICS_PORT}"
     depends_on:
       mysql:
         condition: service_healthy
@@ -35,7 +35,7 @@ services:
       - MYSQL_USER=mysql
       - MYSQL_PASSWORD=${DB_PASSWORD}
     ports:
-      - "3306:3306"
+      - "${DB_PORT}:${DB_PORT}"
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$DB_PASSWORD"]
       interval: 10s
@@ -47,18 +47,18 @@ services:
   prometheus:
     image: prom/prometheus
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
   jaeger:
     image: jaegertracing/all-in-one:1.52
     ports:
-      - "16686:16686"
-      - "4318:4318"   
+      - "${JAEGER_UI_PORT}:${JAEGER_UI_PORT}"
+      - "${JAEGER_OTLP_PORT}:${JAEGER_OTLP_PORT}"   
   grafana:
     image: grafana/grafana
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT}:${GRAFANA_PORT}"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -69,7 +69,7 @@ services:
     image: redis:7
     restart: always
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:${REDIS_PORT}"
     volumes:
       - redis_data:/data
 
