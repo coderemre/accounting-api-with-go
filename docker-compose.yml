@@ -18,8 +18,8 @@ services:
       - .env
     command: ["air", "-c", ".air.toml"]
     environment:
-      - DATABASE_DSN=root:${DB_PASSWORD}@tcp(mysql:3306)/${DB_NAME}?parseTime=true
-      - DB_USER=root
+      - DATABASE_DSN=${DB_USER}:${DB_PASSWORD}@tcp(${DB_HOST}:${DB_PORT})/${DB_NAME}?parseTime=true
+      - DB_USER=mysql
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=mysql
       - DB_PORT=3306
@@ -72,6 +72,21 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+
+  migrate:
+    image: migrate/migrate:latest
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    entrypoint: ["migrate"]
+    command:
+      [
+        "-path", "/migrations",
+        "-database", "mysql://${DB_USER}:${DB_PASSWORD}@tcp(${DB_HOST}:${DB_PORT})/${DB_NAME}?multiStatements=true",
+        "up"
+      ]
 
 volumes:
   mysql_data:

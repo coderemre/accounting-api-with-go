@@ -1,12 +1,22 @@
-.PHONY: dev prod
+.PHONY: dev prod stop restart logs migrate
 
-# Default environment-configurable values
-HOST_PORT ?= 8080
-CONTAINER_PORT ?= 8080
+include .env
 HOST_DIR ?= $(shell pwd)
 
+COMPOSE = docker-compose -f docker-compose.yml
+
 dev:
-	docker-compose up --build
+	$(COMPOSE) up --build
 
 prod:
-	docker-compose up --build
+	ENV=production $(COMPOSE) up --build -d
+
+stop:
+	$(COMPOSE) down -v
+
+restart:
+	$(MAKE) stop
+	$(MAKE) dev
+
+logs:
+	$(COMPOSE) logs -f --tail=100
