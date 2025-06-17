@@ -28,7 +28,12 @@ func (h *BalanceHandler) GetCurrentBalance(w http.ResponseWriter, r *http.Reques
 	}
 	userID := user.ID
 
-	balance, err := h.BalanceService.GetCurrentBalance(userID)
+	currency := r.URL.Query().Get("currency")
+	if currency == "" {
+		currency = "TRY" // varsayılan
+	}
+
+	balance, err := h.BalanceService.GetCurrentBalance(userID, currency)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -45,7 +50,12 @@ func (h *BalanceHandler) GetHistoricalBalances(w http.ResponseWriter, r *http.Re
 	}
 	userID := user.ID
 
-	history, err := h.BalanceService.GetBalanceHistory(userID)
+	currency := r.URL.Query().Get("currency")
+	if currency == "" {
+		currency = "TRY"
+	}
+
+	history, err := h.BalanceService.GetBalanceHistory(userID, currency)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -74,7 +84,12 @@ func (h *BalanceHandler) GetBalanceAtTime(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	balance, err := h.BalanceService.GetBalanceAtTime(userID, parsedTime)
+	currency := r.URL.Query().Get("currency")
+	if currency == "" {
+		currency = "TRY"
+	}
+
+	balance, err := h.BalanceService.GetBalanceAtTime(userID, currency, parsedTime)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return

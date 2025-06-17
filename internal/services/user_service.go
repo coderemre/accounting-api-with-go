@@ -56,7 +56,7 @@ func (s *UserService) Register(ctx context.Context, user *models.User) (*models.
 		return nil, "", err
 	}
 
-	_ = s.BalanceService.UpdateBalance(userID, 0)
+_ = s.BalanceService.UpdateBalance(userID, "TRY", 0)
 
 	token, err := auth.GenerateJWT(*createdUser)
 	if err != nil {

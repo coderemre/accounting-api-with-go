@@ -15,40 +15,19 @@ func NewTransactionRepository(db *sql.DB) *TransactionRepository {
 }
 
 func (r *TransactionRepository) CreateTransaction(tx *models.Transaction) error {
-	query := `
-		INSERT INTO transactions (from_user_id, to_user_id, amount, type, status, created_at)
+	_, err := r.DB.Exec(`
+		INSERT INTO transactions (from_user_id, to_user_id, amount, type, status, currency)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`
-
-	_, err := r.DB.Exec(
-		query,
-		tx.FromUserID,
-		tx.ToUserID,
-		tx.Amount,
-		tx.Type,
-		tx.Status,
-		tx.CreatedAt,
-	)
-
+	`, tx.FromUserID, tx.ToUserID, tx.Amount, tx.Type, tx.Status, tx.Currency)
 	return err
 }
 
-func (r *TransactionRepository) CreateTransfer(senderID, receiverID int64, amount float64) error {
+func (r *TransactionRepository) CreateTransfer(senderID, receiverID int64, amount float64, currency string) error {
 	query := `
-		INSERT INTO transactions (from_user_id, to_user_id, amount, type, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO transactions (from_user_id, to_user_id, amount, type, status, currency, created_at)
+		VALUES (?, ?, ?, 'transfer', 'completed', ?, NOW())
 	`
-
-	_, err := r.DB.Exec(
-		query,
-		senderID,
-		receiverID,
-		amount,
-		"transfer",
-		"completed",
-		time.Now(),
-	)
-
+	_, err := r.DB.Exec(query, senderID, receiverID, amount, currency)
 	return err
 }
 
@@ -60,7 +39,7 @@ func (r *TransactionRepository) GetTransactionByID(transactionID int64) (*models
 	`
 
 	var tx models.Transaction
-	err := r.DB.QueryRow(query).Scan(
+	err := r.DB.QueryRow(query, transactionID).Scan(
 		&tx.ID,
 		&tx.FromUserID,
 		&tx.ToUserID,
@@ -104,6 +83,30 @@ func (r *TransactionRepository) GetTransactionHistory(userID int64) ([]models.Tr
 			&tx.CreatedAt,
 		)
 		if err != nil {
+			return nil, err
+		}
+		transactions = append(transactions, tx)
+	}
+
+	return transactions, nil
+}
+
+func (r *TransactionRepository) GetTransactionsByUserAndType(userID int64, txType string, startTime time.Time) ([]models.Transaction, error) {
+	query := `
+		SELECT id, from_user_id, to_user_id, amount, type, status, created_at
+		FROM transactions
+		WHERE (from_user_id = ? OR to_user_id = ?) AND type = ? AND created_at >= ?
+	`
+	rows, err := r.DB.Query(query, userID, userID, txType, startTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []models.Transaction
+	for rows.Next() {
+		var tx models.Transaction
+		if err := rows.Scan(&tx.ID, &tx.FromUserID, &tx.ToUserID, &tx.Amount, &tx.Type, &tx.Status, &tx.CreatedAt); err != nil {
 			return nil, err
 		}
 		transactions = append(transactions, tx)

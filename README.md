@@ -64,6 +64,8 @@ cd accounting-api-with-go
 	GRAFANA_PORT=3000
 	REDIS_PORT=6379
 	DATABASE_DSN=root:password@tcp(mysql:3306)/bank_app?parseTime=true
+
+	ADMIN_REPLAY_TOKEN= test
 ```
 
 ---
@@ -144,18 +146,6 @@ Example:
 - `POST /transfer` – Transfer balance between users
 - `GET /balance` – Check current balance
 
----
-
-## ✅ TODO (Future Enhancements)
-
-- [ ] Event sourcing for all transactions
-- [ ] Redis caching for frequently accessed records
-- [ ] Scheduled payments (job queue)
-- [ ] Multi-currency support
-- [ ] Circuit breaker + fallback logic
-- [ ] Read-replica support and load balancing
-
----
 
 ## 📄 License
 

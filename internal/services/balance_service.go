@@ -22,12 +22,12 @@ func NewBalanceService(balanceRepo *repositories.BalanceRepository, cache cache.
 	return &BalanceService{BalanceRepo: balanceRepo, Cache: cache}
 }
 
-func (s *BalanceService) GetBalanceHistory(userID int64) ([]models.BalanceHistory, error) {
-	return s.BalanceRepo.GetBalanceHistory(userID)
+func (s *BalanceService) GetBalanceHistory(userID int64, currency string) ([]models.BalanceHistory, error) {
+	return s.BalanceRepo.GetBalanceHistory(userID, currency)
 }
 
-func (s *BalanceService) GetCurrentBalance(userID int64) (float64, error) {
-	cacheKey := fmt.Sprintf("balance:user:%d", userID)
+func (s *BalanceService) GetCurrentBalance(userID int64, currency string) (float64, error) {
+	cacheKey := fmt.Sprintf("balance:user:%d:currency:%s", userID, currency)
 	ctx := context.Background()
 	cachedBalance, err := s.Cache.Get(ctx, cacheKey)
 	if err == nil {
@@ -37,7 +37,7 @@ func (s *BalanceService) GetCurrentBalance(userID int64) (float64, error) {
 		}
 	}
 
-	balance, err := s.BalanceRepo.GetBalance(userID)
+	balance, err := s.BalanceRepo.GetBalance(userID, currency)
 	if err != nil {
 		return 0, err
 	}
@@ -50,8 +50,8 @@ func (s *BalanceService) GetCurrentBalance(userID int64) (float64, error) {
 	return balance.Amount, nil
 }
 
-func (s *BalanceService) GetBalanceAtTime(userID int64, atTime time.Time) (float64, error) {
-	balance, err := s.BalanceRepo.GetBalanceAtTime(userID, atTime)
+func (s *BalanceService) GetBalanceAtTime(userID int64, currency string, atTime time.Time) (float64, error) {
+	balance, err := s.BalanceRepo.GetBalanceAtTime(userID, currency, atTime)
 	if err != nil {
 		return 0, err
 	}
@@ -59,14 +59,16 @@ func (s *BalanceService) GetBalanceAtTime(userID int64, atTime time.Time) (float
 	return balance, nil
 }
 
-func (s *BalanceService) UpdateBalance(userID int64, newAmount float64) error {
+func (s *BalanceService) UpdateBalance(userID int64, currency string, newAmount float64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	err := s.BalanceRepo.UpdateBalance(userID, newAmount)
+
+	err := s.BalanceRepo.UpdateBalance(userID, currency, newAmount)
 	if err != nil {
 		return err
 	}
-	cacheKey := fmt.Sprintf("balance:user:%d", userID)
+
+	cacheKey := fmt.Sprintf("balance:user:%d:currency:%s", userID, currency)
 	ctx := context.Background()
 	err = s.Cache.Delete(ctx, cacheKey)
 	if err != nil {

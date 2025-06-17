@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 
 	"accounting-api-with-go/handlers"
 	"accounting-api-with-go/internal/cache"
+	"accounting-api-with-go/internal/config"
 	"accounting-api-with-go/internal/eventstore"
 	"accounting-api-with-go/internal/middlewares"
 	"accounting-api-with-go/internal/repositories"
@@ -18,17 +18,12 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
-func SetupRoutes(db *sql.DB, es eventstore.EventStore) *mux.Router {
+func SetupRoutes(db *sql.DB, es eventstore.EventStore, redis cache.Cache, cfg *config.Config) *mux.Router {
 	tracer := otel.Tracer("router")
 
 	_, span := tracer.Start(context.Background(), "SetupRoutes")
 	defer span.End()
 
-	redisAddr := os.Getenv("REDIS_PORT")
-	if redisAddr == "" {
-		redisAddr = "redis:6379"
-	}
-	redisCache := cache.NewRedisCache(redisAddr)
 
 	router := mux.NewRouter()
 
@@ -36,9 +31,11 @@ func SetupRoutes(db *sql.DB, es eventstore.EventStore) *mux.Router {
 	balanceRepo := repositories.NewBalanceRepository(db)
 	transactionRepo := repositories.NewTransactionRepository(db)
 
-	balanceService := services.NewBalanceService(balanceRepo, redisCache)
-	userService := services.NewUserService(userRepo, balanceService, es, redisCache)
-	transactionService := services.NewTransactionService(transactionRepo, balanceService, redisCache)
+	balanceService := services.NewBalanceService(balanceRepo, redis)
+	userService := services.NewUserService(userRepo, balanceService, es, redis)
+	limitService := services.NewTransactionLimitService(transactionRepo, cfg.TransactionLimits)
+
+	transactionService := services.NewTransactionService(transactionRepo, balanceService, redis, limitService)
 
 	userHandler := handlers.NewUserHandler(userService)
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
@@ -70,7 +67,7 @@ func SetupRoutes(db *sql.DB, es eventstore.EventStore) *mux.Router {
 	transactionRoutes.HandleFunc("/transfer", transactionHandler.Transfer).Methods("POST")
 	transactionRoutes.HandleFunc("/history", transactionHandler.GetTransactionHistory).Methods("GET")
 	transactionRoutes.HandleFunc("/{id:[0-9]+}", transactionHandler.GetTransactionByID).Methods("GET")
-
+	transactionRoutes.HandleFunc("/batch", transactionHandler.ProcessBatchTransactions).Methods("POST")
 
 	balanceRoutes := router.PathPrefix("/api/v1/balances").Subrouter()
 	balanceRoutes.Use(middlewares.JWTAuthMiddleware(userRepo))

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"accounting-api-with-go/internal/models"
 	"accounting-api-with-go/internal/services"
 	"accounting-api-with-go/internal/utils"
 
@@ -23,6 +24,7 @@ func (h *TransactionHandler) Credit(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		ToUserID int64   `json:"to_user_id"`
 		Amount   float64 `json:"amount"`
+		Currency   string  `json:"currency"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -30,7 +32,7 @@ func (h *TransactionHandler) Credit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transaction, err := h.TransactionService.ProcessTransaction(0, request.ToUserID, request.Amount, "credit")
+	transaction, err := h.TransactionService.ProcessTransaction(0, request.ToUserID, request.Amount, "credit", request.Currency)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
@@ -43,6 +45,7 @@ func (h *TransactionHandler) Debit(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		FromUserID int64   `json:"from_user_id"`
 		Amount     float64 `json:"amount"`
+		Currency   string  `json:"currency"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -50,7 +53,7 @@ func (h *TransactionHandler) Debit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transaction, err := h.TransactionService.ProcessTransaction(request.FromUserID, 0, request.Amount, "debit")
+	transaction, err := h.TransactionService.ProcessTransaction(request.FromUserID, 0, request.Amount, "debit", request.Currency)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
@@ -64,6 +67,7 @@ func (h *TransactionHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		SenderID   int64   `json:"sender_id"`
 		ReceiverID int64   `json:"receiver_id"`
 		Amount     float64 `json:"amount"`
+		Currency   string  `json:"currency"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -71,7 +75,7 @@ func (h *TransactionHandler) Transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.TransactionService.Transfer(request.SenderID, request.ReceiverID, request.Amount)
+	err := h.TransactionService.Transfer(request.SenderID, request.ReceiverID, request.Amount, request.Currency)
 	if err != nil {
 		utils.WriteErrorResponse(w, err.Error(), http.StatusBadRequest)
 		return
@@ -111,4 +115,21 @@ func (h *TransactionHandler) GetTransactionByID(w http.ResponseWriter, r *http.R
 	}
 
 	utils.WriteSuccessResponse(w, transaction, http.StatusOK)
+}
+
+func (h *TransactionHandler) ProcessBatchTransactions(w http.ResponseWriter, r *http.Request) {
+	var batch []models.Transaction
+
+	if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+		utils.WriteErrorResponse(w, "Invalid batch payload", http.StatusBadRequest)
+		return
+	}
+
+	transactions, err := h.TransactionService.ProcessBatchTransactions(r.Context(), batch)
+	if err != nil {
+		utils.WriteErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	utils.WriteSuccessResponse(w, transactions, http.StatusOK)
 }
