@@ -75,3 +75,20 @@ func (r *UserRepository) DeleteUser(ctx context.Context, userID int64) error {
 	_, err := r.DB.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, userID)
 	return err
 }
+
+
+func (r *UserRepository) CreateFromEvent(ctx context.Context, u *models.User) error {
+    query := `
+    INSERT INTO users (
+        id, username, email, password_hash, role
+    ) VALUES (?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+        username = VALUES(username),
+        email = VALUES(email),
+        password_hash = VALUES(password_hash),
+        role = VALUES(role)
+    `
+    _, err := r.DB.ExecContext(ctx, query,u.ID, u.Username, u.Email, u.Password, u.Role)
+
+    return err
+}

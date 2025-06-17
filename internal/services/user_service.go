@@ -2,23 +2,31 @@ package services
 
 import (
 	"accounting-api-with-go/internal/auth"
+	"accounting-api-with-go/internal/cache"
+	"accounting-api-with-go/internal/eventstore"
 	"accounting-api-with-go/internal/models"
 	"accounting-api-with-go/internal/repositories"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
-	UserRepo      *repositories.UserRepository
+	UserRepo       *repositories.UserRepository
 	BalanceService *BalanceService
+	EventStore     eventstore.EventStore
+	Cache          cache.Cache
 }
 
-func NewUserService(userRepo *repositories.UserRepository, balanceService *BalanceService) *UserService {
+func NewUserService(userRepo *repositories.UserRepository, balanceService *BalanceService, es eventstore.EventStore, cache cache.Cache) *UserService {
 	return &UserService{
-		UserRepo:      userRepo,
+		UserRepo:       userRepo,
 		BalanceService: balanceService,
+		EventStore:     es,
+		Cache:          cache,
 	}
 }
 
@@ -55,6 +63,16 @@ func (s *UserService) Register(ctx context.Context, user *models.User) (*models.
 		return nil, "", errors.New("failed to generate token")
 	}
 
+	payload, _ := json.Marshal(createdUser)
+	evt := eventstore.Event{
+		AggregateID: fmt.Sprint(createdUser.ID),
+		Type:        "UserCreated",
+		Payload:     payload,
+	}
+	if err := s.EventStore.SaveEvent(ctx, evt); err != nil {
+		return nil, "", errors.New("failed to save event")
+	}
+
 	return createdUser, token, nil
 }
 
@@ -86,7 +104,25 @@ func (s *UserService) GetAllUsers(ctx context.Context) ([]models.User, error) {
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, userID int64) (*models.User, error) {
-	return s.UserRepo.GetUserByID(ctx, userID)
+	var user models.User
+	cacheKey := fmt.Sprintf("user:%d", userID)
+
+	cached, err := s.Cache.Get(ctx, cacheKey)
+	if err == nil {
+		if err := json.Unmarshal([]byte(cached), &user); err == nil {
+			return &user, nil
+		}
+	}
+
+	u, err := s.UserRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	data, _ := json.Marshal(u)
+	_ = s.Cache.Set(ctx, cacheKey, string(data), 0)
+
+	return u, nil
 }
 
 func (s *UserService) UpdateUser(ctx context.Context, userID int64, user *models.User) error {

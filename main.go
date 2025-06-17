@@ -18,6 +18,7 @@ import (
 
 	"accounting-api-with-go/internal/config"
 	"accounting-api-with-go/internal/database"
+	"accounting-api-with-go/internal/eventstore"
 	"accounting-api-with-go/internal/middlewares"
 	"accounting-api-with-go/internal/utils"
 	"accounting-api-with-go/routes"
@@ -47,7 +48,9 @@ func main() {
 
 	var db = database.Connect()
 
-	router := routes.SetupRoutes(db)
+	es := eventstore.NewMySQLEventStore(db)
+
+	router := routes.SetupRoutes(db, es)
 	router.Use(middlewares.Logger)
 
 	server := &http.Server{

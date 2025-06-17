@@ -1,21 +1,24 @@
 package services
 
 import (
-	"errors"
-
+	"accounting-api-with-go/internal/cache"
 	"accounting-api-with-go/internal/constants"
 	"accounting-api-with-go/internal/models"
-
 	"accounting-api-with-go/internal/repositories"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 )
 
 type TransactionService struct {
 	TransactionRepo *repositories.TransactionRepository
 	BalanceService  *BalanceService
+	Cache           cache.Cache
 }
 
-func NewTransactionService(txRepo *repositories.TransactionRepository, balanceService *BalanceService) *TransactionService {
-	return &TransactionService{TransactionRepo: txRepo, BalanceService: balanceService}
+func NewTransactionService(txRepo *repositories.TransactionRepository, balanceService *BalanceService, cache cache.Cache) *TransactionService {
+	return &TransactionService{TransactionRepo: txRepo, BalanceService: balanceService, Cache: cache}
 }
 
 func (s *TransactionService) ProcessTransaction(fromUserID int64, toUserID int64, amount float64, transactionType string) (*models.Transaction, error) {
@@ -79,12 +82,26 @@ func (s *TransactionService) Transfer(senderID, receiverID int64, amount float64
 }
 
 func (s *TransactionService) GetTransactionByID(transactionID int64) (*models.Transaction, error) {
-	transaction, err := s.TransactionRepo.GetTransactionByID(transactionID)
+	var transaction models.Transaction
+	cacheKey := fmt.Sprintf("transaction:%d", transactionID)
+	ctx := context.Background()
+
+	cached, err := s.Cache.Get(ctx, cacheKey)
+	if err == nil {
+		if err := json.Unmarshal([]byte(cached), &transaction); err == nil {
+			return &transaction, nil
+		}
+	}
+
+	tx, err := s.TransactionRepo.GetTransactionByID(transactionID)
 	if err != nil {
 		return nil, err
 	}
 
-	return transaction, nil
+	data, _ := json.Marshal(tx)
+	_ = s.Cache.Set(ctx, cacheKey, string(data), 0)
+
+	return tx, nil
 }
 
 func (s *TransactionService) GetTransactionHistory(userID int64) ([]models.Transaction, error) {

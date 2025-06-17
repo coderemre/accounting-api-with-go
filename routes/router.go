@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 
 	"accounting-api-with-go/handlers"
+	"accounting-api-with-go/internal/cache"
+	"accounting-api-with-go/internal/eventstore"
 	"accounting-api-with-go/internal/middlewares"
 	"accounting-api-with-go/internal/repositories"
 	"accounting-api-with-go/internal/services"
@@ -15,11 +18,17 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
-func SetupRoutes(db *sql.DB) *mux.Router {
+func SetupRoutes(db *sql.DB, es eventstore.EventStore) *mux.Router {
 	tracer := otel.Tracer("router")
 
 	_, span := tracer.Start(context.Background(), "SetupRoutes")
 	defer span.End()
+
+	redisAddr := os.Getenv("REDIS_PORT")
+	if redisAddr == "" {
+		redisAddr = "redis:6379"
+	}
+	redisCache := cache.NewRedisCache(redisAddr)
 
 	router := mux.NewRouter()
 
@@ -27,22 +36,25 @@ func SetupRoutes(db *sql.DB) *mux.Router {
 	balanceRepo := repositories.NewBalanceRepository(db)
 	transactionRepo := repositories.NewTransactionRepository(db)
 
-	balanceService := services.NewBalanceService(balanceRepo)
-	userService := services.NewUserService(userRepo, balanceService)
-	transactionService := services.NewTransactionService(transactionRepo, balanceService)
+	balanceService := services.NewBalanceService(balanceRepo, redisCache)
+	userService := services.NewUserService(userRepo, balanceService, es, redisCache)
+	transactionService := services.NewTransactionService(transactionRepo, balanceService, redisCache)
 
 	userHandler := handlers.NewUserHandler(userService)
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 	balanceHandler := handlers.NewBalanceHandler(balanceService)
+	adminHandler := handlers.NewAdminHandler(services.NewReplayService(userRepo, transactionService),es)
 
 	authRoutes := router.PathPrefix("/api/v1/auth").Subrouter()
 	authRoutes.HandleFunc("/register", userHandler.Register).Methods("POST")
 	authRoutes.HandleFunc("/login", userHandler.Login).Methods("POST")
 	authRoutes.Handle("/refresh", middlewares.JWTAuthMiddleware(userRepo)(http.HandlerFunc(userHandler.RefreshToken))).Methods("POST")
-
-
+	
 	userRoutes := router.PathPrefix("/api/v1/users").Subrouter()
 	userRoutes.Use(middlewares.JWTAuthMiddleware(userRepo))
+
+	adminRoutes := router.PathPrefix("/api/v1/admin").Subrouter()
+	adminRoutes.HandleFunc("/replay", adminHandler.Replay).Methods("POST")
 
 	userRoutes.HandleFunc("", middlewares.RequireAdmin(userHandler.GetAllUsers)).Methods("GET")
 	userRoutes.HandleFunc("/{id:[0-9]+}", middlewares.RequireAdmin(userHandler.GetUserByID)).Methods("GET")
