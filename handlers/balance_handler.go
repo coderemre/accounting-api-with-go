@@ -30,7 +30,7 @@ func (h *BalanceHandler) GetCurrentBalance(w http.ResponseWriter, r *http.Reques
 
 	currency := r.URL.Query().Get("currency")
 	if currency == "" {
-		currency = "TRY" // varsayılan
+		currency = "TRY"
 	}
 
 	balance, err := h.BalanceService.GetCurrentBalance(userID, currency)

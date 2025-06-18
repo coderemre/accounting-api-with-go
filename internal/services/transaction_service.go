@@ -114,12 +114,10 @@ func (s *TransactionService) Transfer(senderID, receiverID int64, amount float64
 
 	err = s.BalanceService.UpdateBalance(receiverID, currency, amount)
 	if err != nil {
-		// rollback
 		_ = s.BalanceService.UpdateBalance(senderID, currency, amount)
 		return err
 	}
 
-	// currency'li kayıt yapacak şekilde repo fonksiyonun da güncellenmeli
 	return s.TransactionRepo.CreateTransfer(senderID, receiverID, amount, currency)
 }
 
